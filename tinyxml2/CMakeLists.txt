@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 4.1)
 project(tinyxml2 VERSION 9.0.0)
 
 include(CTest)

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.4.1)
+cmake_minimum_required(VERSION 4.1)
 project(pixman C ASM)
 
 file(GENERATE
@@ -73,6 +73,11 @@ if("${CMAKE_ANDROID_ARCH_ABI}" STREQUAL "arm64-v8a")
     set(PIXMAN_CFLAGS ${PIXMAN_CFLAGS}
       "-DUSE_ARM_A64_NEON=1"
       "-DSIZEOF_LONG=8")
+endif()
+
+# Add Emscripten flags
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "Emscripten")
+  set(PIXMAN_CFLAGS ${PIXMAN_CFLAGS} "-s" "USE_PTHREADS=1")
 endif()
 
 if("${CMAKE_ANDROID_ARCH_ABI}" STREQUAL "armeabi-v7a")
