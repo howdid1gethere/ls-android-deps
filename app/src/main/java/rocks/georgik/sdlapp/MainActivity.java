@@ -1456,6 +1456,15 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
         float x, y;
         int action;
 
+        // Palm rejection: a hovering stylus primes the rejection window, so a
+        // palm landing just before the pen touches down is also ignored.
+        int hoverToolType = event.getToolType(event.getActionIndex());
+        if ((event.getSource() & InputDevice.SOURCE_STYLUS) == InputDevice.SOURCE_STYLUS
+                || hoverToolType == MotionEvent.TOOL_TYPE_STYLUS
+                || hoverToolType == MotionEvent.TOOL_TYPE_ERASER) {
+            lastStylusEventTime = System.currentTimeMillis();
+        }
+
         switch ( event.getSource() ) {
             case InputDevice.SOURCE_JOYSTICK:
             case InputDevice.SOURCE_GAMEPAD:
@@ -1492,6 +1501,14 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
 
     long beginTouchTime;
     Handler touchHandler = new Handler();
+
+    // --- Palm rejection (Samsung S-Pen and other styluses) ---
+    // While the stylus is touching the screen, or shortly after it lifts or
+    // while it hovers, finger (and palm) touches are ignored so the user can
+    // rest their hand on the tablet while drawing with the pen.
+    private boolean stylusActive = false;
+    private long lastStylusEventTime = 0;
+    private static final long PALM_REJECT_WINDOW_MS = 600;
 
     void addTouch(MotionEvent event) {
         Touch touch = new Touch();
@@ -1600,6 +1617,42 @@ class SDLSurface extends SurfaceView implements SurfaceHolder.Callback,
         int mouseButton;
         int i = -1;
         float x,y,p;
+
+        // --- Palm rejection ---
+        // Track stylus presence and drop finger/palm touches while the pen is
+        // (or was just) in use.
+        final int actionToolType = event.getToolType(event.getActionIndex());
+        boolean anyStylus = false;
+        for (int pi = 0; pi < pointerCount; pi++) {
+            int tt = event.getToolType(pi);
+            if (tt == MotionEvent.TOOL_TYPE_STYLUS || tt == MotionEvent.TOOL_TYPE_ERASER) {
+                anyStylus = true;
+                break;
+            }
+        }
+        final long nowMs = System.currentTimeMillis();
+        if (anyStylus) {
+            lastStylusEventTime = nowMs;
+        }
+        if (actionToolType == MotionEvent.TOOL_TYPE_STYLUS || actionToolType == MotionEvent.TOOL_TYPE_ERASER) {
+            switch (action) {
+                case MotionEvent.ACTION_DOWN:
+                case MotionEvent.ACTION_POINTER_DOWN:
+                    stylusActive = true;
+                    break;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_POINTER_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    stylusActive = false;
+                    break;
+            }
+        }
+        if (actionToolType == MotionEvent.TOOL_TYPE_FINGER &&
+            (stylusActive || (nowMs - lastStylusEventTime) < PALM_REJECT_WINDOW_MS)) {
+            // A stylus is active (or was within the rejection window): treat
+            // this finger contact as a resting palm and ignore it.
+            return true;
+        }
 
         if (event.getSource() == InputDevice.SOURCE_MOUSE) {
             stopDrag(event);
