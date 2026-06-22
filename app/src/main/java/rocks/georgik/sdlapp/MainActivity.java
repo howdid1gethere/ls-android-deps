@@ -1735,16 +1735,21 @@ class DummyEdit extends View implements View.OnKeyListener {
     @Override
     public boolean onKey(View v, int keyCode, KeyEvent event) {
 
-        // This handles the hardware keyboard input
-        if (event.isPrintingKey() || keyCode == KeyEvent.KEYCODE_SPACE) {
-            if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                ic.commitText(String.valueOf((char) event.getUnicodeChar()), 1);
-            }
-            return true;
-        }
-
+        // This handles the hardware keyboard input.
+        //
+        // Previously, printing keys (letters/numbers) were swallowed into
+        // commitText() and never delivered to SDL as key events, which broke
+        // every letter-based keyboard shortcut (tool keys like B/E/G/M/Z and
+        // combos like Ctrl+S / Ctrl+Z) whenever text input was active -- which
+        // is most of the time in LibreSprite. Always forward the key to SDL so
+        // shortcuts work, and only commit text for a plain printing key (no
+        // Ctrl/Alt/Meta) so normal text entry still functions.
         if (event.getAction() == KeyEvent.ACTION_DOWN) {
             MainActivity.onNativeKeyDown(keyCode);
+            boolean modifierHeld = event.isCtrlPressed() || event.isAltPressed() || event.isMetaPressed();
+            if ((event.isPrintingKey() || keyCode == KeyEvent.KEYCODE_SPACE) && !modifierHeld) {
+                ic.commitText(String.valueOf((char) event.getUnicodeChar()), 1);
+            }
             return true;
         } else if (event.getAction() == KeyEvent.ACTION_UP) {
             MainActivity.onNativeKeyUp(keyCode);
