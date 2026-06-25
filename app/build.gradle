@@ -2,6 +2,15 @@ apply plugin: 'com.android.application'
 
 apply plugin: 'kotlin-android'
 
+// Load release-signing details from a gitignored keystore.properties so the
+// keystore password never lands in the (public) repo. If the file is absent
+// (e.g. a fresh checkout), release signing is simply skipped.
+def keystorePropsFile = rootProject.file("keystore.properties")
+def keystoreProps = new Properties()
+if (keystorePropsFile.exists()) {
+    keystoreProps.load(new FileInputStream(keystorePropsFile))
+}
+
 android {
     namespace 'rocks.georgik.sdlapp'
     compileSdkVersion = 35
@@ -51,10 +60,12 @@ android {
     }
     signingConfigs {
         release {
-            storeFile file("keystore-path")
-            storePassword "keystore-pass"
-            keyAlias "alias"
-            keyPassword "alias-password"
+            if (keystorePropsFile.exists()) {
+                storeFile file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
 
             // Optional, specify signing versions used
             v1SigningEnabled true
@@ -65,8 +76,7 @@ android {
         release {
             minifyEnabled = false
             proguardFiles.add(file('proguard-rules.txt'))
-            // Uncomment to enable apk signing (and also fill details in signingConfigs Block)
-            // signingConfig signingConfigs.release
+            signingConfig signingConfigs.release
         }
     }
 
